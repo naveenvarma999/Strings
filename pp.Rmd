@@ -1,0 +1,387 @@
+---
+title: "MA334: Project Report"
+author: "Nallapu Naveen"
+date: "2026-01-09"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+```{r setup, include=FALSE}
+rm(list = ls())
+
+req_packages <- c("knitr", "ggplot2", "tinytex")
+missing <- req_packages[!req_packages %in% rownames(installed.packages())]
+if (length(missing) > 0) install.packages(missing, dependencies = TRUE)
+
+invisible(lapply(req_packages, library, character.only = TRUE))
+
+if (!tinytex::is_tinytex()) tinytex::install_tinytex()
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+
+# 1. Data Exploration
+
+## (1a) Summary of the Data Set
+
+```{r q1a, echo=TRUE, include=TRUE, message=FALSE, warning=FALSE}
+library(knitr)
+# Loading the data
+data <- read.csv("MA334-AU-7_2501629.csv")
+data_pre <- head(data, 2)
+kable(data_pre, caption = "First 2 Observations")
+```
+#### Dataset Dimensions
+```{r q1_datadimensions, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE}
+# Number of observations and variables
+kable(data.frame(
+  Item = c("Total Observations", "Total Variables"),
+  Value = c(nrow(data), ncol(data))
+), caption = "Dataset Dimensions")
+```
+
+
+Table 2 shows that the dataset contains 1,000 observations and 10 variables.
+
+#### Variable names and types
+```{r q1a_types, echo=TRUE, include=FALSE, message=FALSE, warning=FALSE}
+kable(data.frame(Variable = names(data), Type = unname(sapply(data, class))),
+      caption = "Variable Names and Data Types")
+```
+
+Table 3 shows all the variables in the dataset and their data types. Some variables contain numbers (such as carat, depth, price, table and x, y, z), and others contain categories (cut, color, and clarity).
+
+
+## (1b) Location and Spread of Variables
+#### Numeric variables
+```{r q1b, echo=TRUE, include=FALSE, message=FALSE, warning=FALSE}
+# Selecting numeric variables only
+numeric_data <- data[sapply(data, is.numeric)]
+
+# Creating a table of summary statistics
+summary_table <- data.frame(
+  Variable = names(numeric_data),
+  Mean = sapply(numeric_data, mean),
+  Median = sapply(numeric_data, median),
+  Standard_Deviation = sapply(numeric_data, sd),
+  Range = sapply(numeric_data, function(x) max(x) - min(x))
+)
+kable(summary_table, caption = "Summary Statistics for Numeric Variables")
+```
+
+This table shows typical values (mean and median) and how spread out the values are (standard deviation and range) for each numeric variable.
+
+
+#### Mode for categorical variables
+
+```{r q1b_mode, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE}
+mode_table <- data.frame(
+  Variable = c("cut", "color", "clarity"),
+  Mode = c(
+    names(which.max(table(data$cut))),
+    names(which.max(table(data$color))),
+    names(which.max(table(data$clarity)))
+  ),
+  Frequency = c(
+    max(table(data$cut)),
+    max(table(data$color)),
+    max(table(data$clarity))
+  )
+)
+kable(mode_table, caption = "Mode for Categorical Variables")
+```
+
+######  Frequency Distribution of Cut
+```{r q1b_frequency_tables, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE}
+library(knitr)
+cut_freq <- as.data.frame(table(data$cut))
+colnames(cut_freq) <- c("Cut", "Frequency")
+kable(cut_freq, caption = "Frequency Distribution of Diamond Cut")
+```
+
+###### Frequency Distribution of Color
+```{r q1b_frequency_tables_color, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE}
+color_freq <- as.data.frame(table(data$color))
+colnames(color_freq) <- c("Color", "Frequency")
+kable(color_freq, caption = "Frequency Distribution of Diamond Color")
+```
+
+###### Frequency Distribution of Clarity
+```{r q1b_frequency_tables_clrty, echo=FALSE, include=TRUE, message=FALSE, warning=FALSE}
+clarity_freq <- as.data.frame(table(data$clarity))
+colnames(clarity_freq) <- c("Clarity", "Frequency")
+kable(clarity_freq, caption = "Frequency Distribution of Diamond Clarity")
+```
+
+
+## (1c) Visualisations of Variable Distributions
+
+```{r q1c_plots, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+
+# 1) Numeric variables: histograms
+par(mfrow = c(2, 2), mar = c(4, 4, 2, 1))
+hist(data$price, main = "Distribution of Price", xlab = "Price", breaks = 30)
+hist(data$carat, main = "Distribution of Carat", xlab = "Carat", breaks = 30)
+hist(data$depth, main = "Distribution of Depth", xlab = "Depth", breaks = 30)
+hist(data$table, main = "Distribution of Table", xlab = "Table", breaks = 30)
+
+par(mfrow = c(1, 1))
+
+# 2) Categorical variables: barplots
+par(mfrow = c(1, 3), mar = c(7, 4, 2, 1))
+
+barplot(table(data$cut), main = "Distribution of Cut", las = 2)
+barplot(table(data$color), main = "Distribution of Color", las = 2)
+barplot(table(data$clarity), main = "Distribution of Clarity", las = 2)
+
+par(mfrow = c(1, 1))
+```
+
+## (1d) Produce and interpret a correlation matrix between the numeric variables
+
+```{r q2aicrlt, echo=FALSE}
+numeric_data <- data[sapply(data, is.numeric)]
+cor_matrix <- cor(numeric_data)
+knitr::kable(round(cor_matrix, 2),
+             caption = "Correlation Matrix of Numeric Variables")
+```
+
+Price shows a strong positive correlation with carat (r = 0.91), making it the strongest numeric variable associated with price and it also has high correlations with the diamond dimensions x and y (r = 0.85) and z (r = 0.84). However, depth is not correlated with price (r = 0.00) and table is only weakly correlated (r = 0.15). Overall, carat and size-related variables (x, y, z) are the main numeric drivers of price in this dataset.
+
+##### =========================
+
+# Question 2: Probability, distributions, and confidence intervals
+
+##### =========================
+
+# (a) A diamond is chosen at random
+
+## (i) Probability price exceeds \$10,000
+
+```{r q2ai, echo=FALSE}
+probability_price_get_10000 <- mean(data$price > 10000)
+probability_price_get_10000
+```
+
+About 9.3% of the diamonds in this dataset are priced above $10,000. So if we randomly select one, there's a 9.3% chance it'll be one of those expensive ones.
+
+## (ii) Probability diamond is Ideal cut
+
+```{r q2aii, echo=FALSE}
+probability_ideal <- mean(data$cut == "Ideal")
+probability_ideal
+```
+
+About 39.4% of the diamonds are of Ideal cut. Hence, the probability that a randomly chosen diamond is Ideal cut is 0.394.
+
+## (b) Sample of 20 diamonds
+
+```{r q2b, echo=FALSE}
+prob_more_than_12_ideal <- 1 - pbinom(12, size = 20, prob = probability_ideal)
+prob_more_than_12_ideal
+```
+###### Working:
+
+Let X be the number of Ideal cut diamonds in 20 diamonds and
+each diamond can be Ideal or not, so X follows a Binomial distribution:
+
+X ~ Bin(20, 0.394).
+
+We need P(X > 12), so we do 1 - P(X <= 12).
+
+That is: P(X > 12) = 1 - pbinom(12, 20, 0.394) = 0.01834.
+
+Answer: 0.01834 = 1.83%
+
+If we randomly select 20 diamonds, there's less than a 1.83% chance that more than 12 of them will be Ideal cuts.
+
+
+## (c) Confidence intervals for mean carat weight
+
+```{r q2c, echo=FALSE}
+n <- length(data$carat)
+xbar <- mean(data$carat)
+s <- sd(data$carat)
+
+ci_90 <- xbar + c(-1, 1) * qt(0.95, df = n - 1) * s / sqrt(n)
+ci_90
+
+ci_95 <- xbar + c(-1, 1) * qt(0.975, df = n - 1) * s / sqrt(n)
+ci_95
+```
+We are 90% confident that the true mean carat weight lies between 0.758 and 0.806. We are 95% confident that the true mean carat weight lies between 0.753 and 0.810.
+
+```{r q2c_comparison, echo=FALSE}
+width_90 <- ci_90[2] - ci_90[1]
+width_95 <- ci_95[2] - ci_95[1]
+width_90
+width_95
+```
+The 95% confidence interval is wider than the 90% interval because higher confidence requires a broader range.
+
+# Question 3: Hypothesis Tests
+
+## (3a) i–ii: Distributions of price for Ideal and Very Good
+```{r q31_2, echo=FALSE}
+ideal_price <- data$price[data$cut == "Ideal"]
+vg_price <- data$price[data$cut == "Very Good"]
+par(mfrow = c(1, 2))
+hist(ideal_price, main = "Price: Ideal Cut", xlab = "Price")
+hist(vg_price, main = "Price: Very Good Cut", xlab = "Price")
+par(mfrow = c(1, 1))
+```
+
+## iii) Based on the plots, do you believe they are normally distributed?
+
+The price distributions for both Ideal and Very Good cut diamonds are right-skewed and not symmetric. Therefore, the prices do not appear to be normally distributed.
+
+
+## (3a) iv: Create ln(price) and repeat plots
+```{r q2aidlnr, echo=FALSE}
+data$ln_price <- log(data$price)
+ideal_ln <- data$ln_price[data$cut == "Ideal"]
+vg_ln <- data$ln_price[data$cut == "Very Good"]
+```
+
+```{r q3a4, echo=FALSE}
+par(mfrow = c(1, 2))
+hist(ideal_ln, main = "ln(Price): Ideal Cut", xlab = "ln(Price)")
+hist(vg_ln, main = "ln(Price): Very Good Cut", xlab = "ln(Price)")
+par(mfrow = c(1, 1))
+```
+
+After applying ln(price), both plots look more balanced and less skewed. So, the ln(price) values appear more normally distributed than the original prices for both cuts.
+
+
+## (3b) t-test on price (5% level)
+
+#### H0: mean price (Ideal) = mean price (Very Good)
+
+#### H1: mean price (Ideal) != mean price (Very Good)
+
+```{r q3b, echo=FALSE}
+t_price <- t.test(ideal_price, vg_price, alternative = "two.sided", conf.level = 0.95)
+t_price
+```
+We test whether the average price of Ideal cut diamonds is different from that of Very Good cut diamonds. The p-value is 0.2219, which is greater than 0.05, so we do not reject the null hypothesis. This means there is no significant difference in the mean prices of Ideal and Very Good cut diamonds at the 5% significance level.
+
+
+## (3c) t-test on ln(price) (5% level)
+
+#### H0: mean ln(price) (Ideal) = mean ln(price) (Very Good)
+
+#### H1: mean ln(price) (Ideal) != mean ln(price) (Very Good)
+
+```{r q3c, echo=FALSE}
+t_ln <- t.test(ideal_ln, vg_ln, alternative = "two.sided", conf.level = 0.95)
+t_ln
+```
+We checked if Ideal and Very Good diamonds cost different after using ln(price) and the test says they cost almost the same, so there is no real difference.
+
+## (3d) Did you obtain the same conclusion from (b) and (c)? Explain why.
+
+```{r q3d, echo=TRUE}
+t_price$p.value
+t_ln$p.value
+```
+
+Yes, both tests give the same conclusion because both p-values are greater than 0.05, so we fail to reject the null hypothesis and taking ln(price) reduces skewness but does not change the mean difference between Ideal and Very Good diamonds enough to become statistically significant.
+
+## (3e) Chi-square independence test: price group (\>5000) vs clarity
+
+**Hypotheses:**
+- **H₀ (Null):** Price group (high/low) and clarity are independent
+- **H₁ (Alternative):** Price group and clarity are dependent
+
+```{r q3e, echo=FALSE}
+# Create price group variable
+data$price_group <- ifelse(data$price > 5000, "High", "Low")
+# Creating contingency table
+contingency_table <- table(data$price_group, data$clarity)
+contingency_table
+# Performing chi-square test
+chi_test <- chisq.test(contingency_table)
+chi_test
+```
+
+The p-value is 9.661e-05 which is less than 0.05, so we reject the null hypothesis of independence and this means price group and clarity are associated, so high-price diamonds (>5000) and low-price diamonds (≤5000) have different clarity distributions.
+
+
+# Question 4: Linear Regression
+
+```{r q4, echo=FALSE}
+data$ln_price <- log(data$price)
+data$ln_carat <- log(data$carat)
+```
+
+## (4a) Scatter plot of ln(price) vs ln(carat)
+```{r q4a, echo=FALSE, fig.width=12, fig.height=6, out.width="100%"}
+library(ggplot2)
+ggplot(data, aes(x = ln_carat, y = ln_price)) +
+  geom_point() +
+  labs(x = "ln(carat)", y = "ln(price)", title = "ln(price) vs ln(carat)")
+```
+The scatter plot shows a clear upward trend. This means that as ln(carat) increases, ln(price) also increases, suggesting a strong positive relationship between carat size and price.
+
+## (4b) Simple regression: ln(price) \~ ln(carat)
+```{r q4b, echo=FALSE}
+m1 <- lm(ln_price ~ ln_carat, data = data)
+s1 <- summary(m1)
+```
+#### (4b)(i) slope
+```{r q4b1, echo=FALSE}
+coef(m1)["ln_carat"]
+```
+The slope is 1.656, which means that a 1% increase in carat size leads to about a 1.66% increase in price on average.
+
+#### (4b)(ii) p-value for ln(carat)
+```{r q4b2, echo=FALSE}
+s1$coefficients["ln_carat", "Pr(>|t|)"]
+```
+The p-value is 0, which is much smaller than 0.05. This shows that ln(carat) is a statistically significant predictor of ln(price).
+
+
+#### (4b)(iii) R-squared
+```{r q4b3, echo=FALSE}
+r_squared <- s1$r.squared
+r_squared
+```
+R-squared is 0.9279, so ln(carat) explains about 92.8% of the variation in ln(price) and that’s really high, which means the model fits very well and carat is a strong predictor of price.
+
+## (4c) Multiple regression: ln(price) \~ ln(carat) + cut
+
+**Estimated model:**
+Predicted ln(price) = 8.151 + 1.679 × ln(carat) + 0.168 × (Good) + 0.363 × (Ideal) + 0.307 × (Premium) + 0.286 × (Very Good)
+
+**Note:** The reference category for cut is Fair, so all cut coefficients are compared to Fair.
+
+```{r q4c, echo=FALSE}
+# Fit the multiple regression model
+m2 <- lm(ln_price ~ ln_carat + cut, data = data)
+s2 <- summary(m2)
+s2
+```
+After adding cut to the model, ln(carat) is still highly significant. All cut categories are also significant, showing that both carat size and cut quality affect diamond prices.
+
+## (4d) Significant variables at 1% level
+```{r q4d, echo=FALSE}
+rownames(s2$coefficients)[s2$coefficients[, "Pr(>|t|)"] < 0.01]
+```
+At the 1% significance level, ln(carat) and all cut categories are significant. This means these variables have a strong and reliable effect on ln(price).
+
+
+## (4e) Hypothesis test for ln(carat) in model (c)
+
+###### H0: beta_ln_carat = 0
+###### H1: beta_ln_carat != 0
+
+```{r q4e, echo=FALSE}
+s2$coefficients["ln_carat", ]
+```
+
+The t-statistic is very large (115.94) and the p-value is 0, confirming strong evidence that ln(carat) has a significant positive effect on ln(price).
