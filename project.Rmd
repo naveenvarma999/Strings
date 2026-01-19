@@ -1,0 +1,122 @@
+---
+title: "MA334 Statistical Report"
+author: "Naveen"
+output:
+  pdf_document: default
+  html_document:
+    toc: true
+    number_sections: true
+---
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# =======================
+# CLEAN ENVIRONMENT
+# =======================
+rm(list = ls())
+
+# =======================
+# LOAD LIBRARIES
+# =======================
+library(knitr)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+
+# =======================
+# LOAD DATA
+# =======================
+data <- read.csv("MA334-AU-7_2501629.csv")
+
+# =======================
+# SECTION 1: DATA EXPLORATION
+# =======================
+cat("# 1. Data Exploration\n\n")
+
+cat("## (a) Summary of the Data Set\n\n")
+
+kable(head(data, 2), caption = "First Two Observations")
+
+kable(
+  data.frame(
+    Item = c("Total Observations", "Total Variables"),
+    Value = c(nrow(data), ncol(data))
+  ),
+  caption = "Dataset Dimensions"
+)
+
+cat("\n**Interpretation:**  \n")
+cat(
+  paste0(
+    "The dataset contains **",
+    nrow(data),
+    " observations** and **",
+    ncol(data),
+    " variables**, which is sufficient for reliable statistical analysis.\n\n"
+  )
+)
+
+# =======================
+# VARIABLE TYPES
+# =======================
+cat("## (b) Variable Types\n\n")
+
+var_types <- data.frame(
+  Variable = names(data),
+  Data_Type = sapply(data, class)
+)
+
+kable(var_types, caption = "Variable Data Types")
+
+cat("\n**Interpretation:**  \n")
+cat(
+  "Numeric variables are suitable for statistical modelling, while categorical variables help in group-based comparisons.\n\n"
+)
+
+# =======================
+# MISSING VALUES
+# =======================
+cat("## (c) Missing Values\n\n")
+
+missing_values <- data.frame(
+  Variable = names(data),
+  Missing_Count = sapply(data, function(x) sum(is.na(x)))
+)
+
+kable(missing_values, caption = "Missing Values Summary")
+
+cat("\n**Interpretation:**  \n")
+cat(
+  "Variables with missing values may require cleaning or careful handling before further analysis.\n\n"
+)
+
+# =======================
+# SIDE-BY-SIDE PLOTS
+# =======================
+cat("## (d) Distribution Plots\n\n")
+
+p1 <- ggplot(data, aes(x = price)) +
+  geom_histogram(bins = 30) +
+  labs(title = "Distribution of Price", x = "Price", y = "Frequency")
+
+p2 <- ggplot(data, aes(x = carat)) +
+  geom_histogram(bins = 30) +
+  labs(title = "Distribution of Carat", x = "Carat", y = "Frequency")
+
+grid.arrange(p1, p2, ncol = 2)
+
+cat("\n**Interpretation:**  \n")
+cat(
+  "Both variables show skewed distributions, suggesting that logarithmic transformation may be useful in regression analysis.\n\n"
+)
+
+# =======================
+# SUMMARY STATISTICS
+# =======================
+cat("## (e) Summary Statistics\n\n")
+
+kable(summary(data), caption = "Summary Statistics")
+
+cat("\n**Interpretation:**  \n")
+cat(
+  "The summary statistics describe the central tendency and variability of the variables, helping identify outliers and overall data behaviour.\n"
+)
